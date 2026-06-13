@@ -47,7 +47,9 @@ async def smoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data=update.effective_user.first_name
     )
 
-app = Application.builder().token("TOKEN").build()
+TOKEN = os.getenv("BOT_TOKEN")
+
+app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("meal", meal))
