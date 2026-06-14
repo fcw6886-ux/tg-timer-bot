@@ -12,9 +12,9 @@ DATA_FILE = "data.json"
 
 keyboard = ReplyKeyboardMarkup(
     [
-        ["上班/on", "下班/off", "吃饭/mael"],
+        ["上班/on", "下班/off", "吃饭/meal"],
         ["上厕所/wc", "抽烟/smoke", "其他"],
-        ["回坐"]
+        ["回坐/back"]
     ],
     resize_keyboard=True
 )
@@ -125,7 +125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     init_user(data, day, uid, name)
 
-    if text == "上班":
+    if text == "上班/on":
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         save_data(data)
@@ -136,7 +136,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard
         )
 
-    elif text == "下班":
+    elif text == "下班/off":
         on_time_str = data[day][uid].get("on")
 
         if not on_time_str:
@@ -160,18 +160,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard
         )
 
-    elif text == "吃饭":
+    elif text == "吃饭/meal":
         await go_away(update, context, "meal", "吃饭", 30)
 
-    elif text == "上厕所":
+    elif text == "上厕所/wc":
         await go_away(update, context, "toilet", "上厕所", 10)
 
-    elif text == "抽烟":await go_away(update, context, "smoke", "抽烟", 10)
+    elif text == "抽烟/smoke":await go_away(update, context, "smoke", "抽烟", 10)
 
     elif text == "其他":
         await go_away(update, context, "other", "其他", 10)
 
-    elif text == "回坐":
+    elif text == "回坐/back":
         away = data[day][uid].get("away")
         data[day][uid]["back"] += 1
 
