@@ -14,7 +14,7 @@ keyboard = ReplyKeyboardMarkup(
     [
         ["上班/on", "下班/off", "吃饭/meal"],
         ["上厕所/wc", "抽烟/smoke", "其他"],
-        ["回坐/back"]
+        ["回坐", "统计/report"]
     ],
     resize_keyboard=True
 )
@@ -63,18 +63,19 @@ def init_user(data, day, uid, name):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 打卡机器人已启动\n请点击下面按钮操作",
+        "🤖 打卡机器人已启动\n请点击下面按钮操作\n\n发送 /id 获取群ID",
         reply_markup=keyboard
     )
+
+
+async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"Chat ID: {update.effective_chat.id}")
 
 
 async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     name = context.job.data
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"⚠️ {name} 已超时，请尽快回坐。"
-    )
+    await context.bot.send_message(chat_id=chat_id, text=f"⚠️ {name} 已超时，请尽快回坐。")
 
 
 async def go_away(update, context, kind, label, mins):
@@ -129,26 +130,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         save_data(data)
-
         await update.message.reply_text(
-            f"✅ 上班打卡成功\n"
-            f"🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"✅ 上班打卡成功\n🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
             reply_markup=keyboard
         )
 
     elif text == "下班/off":
         on_time_str = data[day][uid].get("on")
-
         if not on_time_str:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
             return
 
         on_time = datetime.fromisoformat(on_time_str)
-        diff = now - on_time
-        total_minutes = int(diff.total_seconds() // 60)
-        hours = total_minutes // 60
-        minutes = total_minutes % 60
-
+        total_minutes = int((now - on_time).total_seconds() // 60)
         data[day][uid]["off"] = now.isoformat()
         save_data(data)
 
@@ -156,22 +150,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ 下班打卡成功\n"
             f"🕘 上班时间：{on_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"🕕 下班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"🕒 今日工时：{hours}小时{minutes}分钟",
+            f"🕒 今日工时：{total_minutes // 60}小时{total_minutes % 60}分钟",
             reply_markup=keyboard
         )
 
     elif text == "吃饭/meal":
         await go_away(update, context, "meal", "吃饭", 30)
 
-    elif text == "上厕所/wc":
-        await go_away(update, context, "toilet", "上厕所", 10)
+    elif text == "上厕所/wc":await go_away(update, context, "toilet", "上厕所", 10)
 
-    elif text == "抽烟/smoke":await go_away(update, context, "smoke", "抽烟", 10)
+    elif text == "抽烟/smoke":
+        await go_away(update, context, "smoke", "抽烟", 10)
 
     elif text == "其他":
         await go_away(update, context, "other", "其他", 10)
 
-    elif text == "回坐/back":
+    elif text == "回坐":
         away = data[day][uid].get("away")
         data[day][uid]["back"] += 1
 
@@ -181,8 +175,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not away:
             save_data(data)
             await update.message.reply_text(
-                f"✅ 回坐成功\n"
-                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"✅ 回坐成功\n🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
                 reply_markup=keyboard
             )
             return
@@ -194,16 +187,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data[day][uid]["away"] = None
         save_data(data)
 
-        if actual_minutes <= allowed:
-            result = "✅ 准时回坐"
-        else:
-            result = f"⚠️ 超时 {actual_minutes - allowed} 分钟"
+        result = "✅ 准时回坐" if actual_minutes <= allowed else f"⚠️ 超时 {actual_minutes - allowed} 分钟"
 
         await update.message.reply_text(
             f"{result}\n"
             f"📌 类型：{away['label']}\n"
             f"⏱ 实际离开：{actual_minutes}分钟\n"
             f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+            reply_markup=keyboard
+        )
+
+    elif text == "统计/report":
+        user_data = data[day][uid]
+        on_text = "未打卡"
+        off_text = "未打卡"
+        work_text = "未计算"
+
+        if user_data.get("on"):
+            on_dt = datetime.fromisoformat(user_data["on"])
+            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+            if user_data.get("off"):
+                off_dt = datetime.fromisoformat(user_data["off"])
+                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
+                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+                work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
+
+        await update.message.reply_text(
+            f"📊 今日统计\n\n"
+            f"👤 姓名：{user_data.get('name', name)}\n"
+            f"🕘 上班：{on_text}\n"
+            f"🕕 下班：{off_text}\n"
+            f"🕒 工时：{work_text}\n\n"
+            f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+            f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
+            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+            f"📌 其他：{user_data.get('other', 0)}分钟\n"
+            f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
 
@@ -214,8 +234,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("id", get_id))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("Bot started with button menu and Beijing time")
+print("Bot started with /id")
 
 app.run_polling()
