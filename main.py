@@ -1,20 +1,26 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TOKEN = os.getenv("BOT_TOKEN")
+
 BJ_TZ = ZoneInfo("Asia/Shanghai")
 DATA_FILE = "data.json"
+
+GROUP_IDS = [
+    -1002261583659,
+    -1002212346327
+]
 
 keyboard = ReplyKeyboardMarkup(
     [
         ["上班/on", "下班/off", "吃饭/meal"],
         ["上厕所/wc", "抽烟/smoke", "其他"],
-        ["回坐", "统计/report"]
+        ["回坐/back", "统计/report"]
     ],
     resize_keyboard=True
 )
@@ -75,7 +81,11 @@ async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     name = context.job.data
-    await context.bot.send_message(chat_id=chat_id, text=f"⚠️ {name} 已超时，请尽快回坐。")
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⚠️ {name} 已超时，请尽快回坐。"
+    )
 
 
 async def go_away(update, context, kind, label, mins):
@@ -116,6 +126,47 @@ async def go_away(update, context, kind, label, mins):
     )
 
 
+async def daily_report(context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    day = today_key()
+
+    if day not in data or not data[day]:
+        msg = f"📊 每日考勤统计 {day}\n\n暂无数据"
+    else:
+        msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
+
+        for user_data in data[day].values():
+            on_text = "未打卡"
+            off_text = "未打卡"
+            work_text = "未计算"
+
+            if user_data.get("on"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                on_text = on_dt.strftime("%H:%M:%S")
+
+                if user_data.get("off"):
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    off_text = off_dt.strftime("%H:%M:%S")
+
+                    work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+                    work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
+
+            msg += (
+                f"👤 {user_data.get('name', '用户')}\n"
+                f"🕘 上班：{on_text}\n"
+                f"🕕 下班：{off_text}\n"
+                f"🕒 工时：{work_text}\n"
+                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+                f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
+                f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+                f"📌 其他：{user_data.get('other', 0)}分钟\n"
+                f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
+            )
+
+    for group_id in GROUP_IDS:
+        await context.bot.send_message(chat_id=group_id, text=msg)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     data = load_data()
@@ -130,19 +181,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         save_data(data)
+
         await update.message.reply_text(
-            f"✅ 上班打卡成功\n🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"✅ 上班打卡成功\n"
+            f"🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
             reply_markup=keyboard
         )
 
     elif text == "下班/off":
         on_time_str = data[day][uid].get("on")
+
         if not on_time_str:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
             return
 
         on_time = datetime.fromisoformat(on_time_str)
         total_minutes = int((now - on_time).total_seconds() // 60)
+
         data[day][uid]["off"] = now.isoformat()
         save_data(data)
 
@@ -157,7 +212,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "吃饭/meal":
         await go_away(update, context, "meal", "吃饭", 30)
 
-    elif text == "上厕所/wc":await go_away(update, context, "toilet", "上厕所", 10)
+    elif text == "上厕所/wc":
+        await go_away(update, context, "toilet", "上厕所", 10)
 
     elif text == "抽烟/smoke":
         await go_away(update, context, "smoke", "抽烟", 10)
@@ -165,7 +221,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "其他":
         await go_away(update, context, "other", "其他", 10)
 
-    elif text == "回坐":
+    elif text == "回坐/back":
         away = data[day][uid].get("away")
         data[day][uid]["back"] += 1
 
@@ -175,7 +231,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not away:
             save_data(data)
             await update.message.reply_text(
-                f"✅ 回坐成功\n🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"✅ 回坐成功\n"
+                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
                 reply_markup=keyboard
             )
             return
@@ -199,6 +256,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "统计/report":
         user_data = data[day][uid]
+
         on_text = "未打卡"
         off_text = "未打卡"
         work_text = "未计算"
@@ -237,6 +295,12 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("id", get_id))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("Bot started with /id")
+app.job_queue.run_daily(
+    daily_report,
+    time=time(23, 55, tzinfo=BJ_TZ),
+    name="daily_report"
+)
+
+print("Bot started with Beijing time and daily reports")
 
 app.run_polling()
