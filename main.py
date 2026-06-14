@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 from telegram import Update
+BJ_TZ = ZoneInfo("Asia/Shanghai")
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -12,7 +13,7 @@ records = {}
 
 
 def now_time():
-    return datetime.now()
+    return datetime.now(BJ_TZ)
 
 
 def today_key():
