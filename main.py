@@ -12,8 +12,8 @@ DATA_FILE = "data.json"
 
 keyboard = ReplyKeyboardMarkup(
     [
-        ["上班", "下班", "吃饭"],
-        ["上厕所", "抽烟", "其他"],
+        ["上班/on", "下班/off", "吃饭/mael"],
+        ["上厕所/wc", "抽烟/smoke", "其他"],
         ["回坐"]
     ],
     resize_keyboard=True
