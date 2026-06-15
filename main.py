@@ -293,7 +293,14 @@ app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("id", get_id))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(
+    MessageHandler(
+        filters.Regex(
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐|统计/report)$"
+        ),
+        handle_message
+    )
+)
 
 app.job_queue.run_daily(
     daily_report,
