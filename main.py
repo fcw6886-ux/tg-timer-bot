@@ -79,11 +79,19 @@ async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.job.chat_id
-    name = context.job.data
+    info = context.job.data
+    uid = info["uid"]
+    name = info["name"]
+    day = info["day"]
+
+    data = load_data()
+    away = data.get(day, {}).get(uid, {}).get("away")
+
+    if not away:
+        return
 
     await context.bot.send_message(
-        chat_id=chat_id,
+        chat_id=context.job.chat_id,
         text=f"⚠️ {name} 已超时，请尽快回坐。"
     )
 
@@ -107,15 +115,19 @@ async def go_away(update, context, kind, label, mins):
 
     save_data(data)
 
-    for job in context.job_queue.get_jobs_by_name(uid):
+    for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
         job.schedule_removal()
 
     context.job_queue.run_once(
         timeout_notice,
         mins * 60,
         chat_id=update.effective_chat.id,
-        data=name,
-        name=uid
+        data={
+            "uid": uid,
+            "name": name,
+            "day": day
+        },
+        name=f"timeout_{uid}"
     )
 
     await update.message.reply_text(
@@ -147,7 +159,6 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
                 if user_data.get("off"):
                     off_dt = datetime.fromisoformat(user_data["off"])
                     off_text = off_dt.strftime("%H:%M:%S")
-
                     work_minutes = int((off_dt - on_dt).total_seconds() // 60)
                     work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
 
@@ -155,8 +166,7 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
                 f"👤 {user_data.get('name', '用户')}\n"
                 f"🕘 上班：{on_text}\n"
                 f"🕕 下班：{off_text}\n"
-                f"🕒 工时：{work_text}\n"
-                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+                f"🕒 工时：{work_text}\n"f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
                 f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
                 f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
                 f"📌 其他：{user_data.get('other', 0)}分钟\n"
@@ -225,7 +235,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         away = data[day][uid].get("away")
         data[day][uid]["back"] += 1
 
-        for job in context.job_queue.get_jobs_by_name(uid):
+        for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
             job.schedule_removal()
 
         if not away:
@@ -279,24 +289,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🕒 工时：{work_text}\n\n"
             f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
             f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-            f"📌 其他：{user_data.get('other', 0)}分钟\n"
+            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"f"📌 其他：{user_data.get('other', 0)}分钟\n"
             f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
-
-    else:
-        await update.message.reply_text("请点击下面按钮操作", reply_markup=keyboard)
 
 
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("id", get_id))
+
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐|统计/report)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report)$"
         ),
         handle_message
     )
@@ -308,6 +315,6 @@ app.job_queue.run_daily(
     name="daily_report"
 )
 
-print("Bot started with Beijing time and daily reports")
+print("Bot started OK")
 
 app.run_polling()
