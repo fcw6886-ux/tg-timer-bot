@@ -7,7 +7,6 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TOKEN = os.getenv("BOT_TOKEN")
-
 BJ_TZ = ZoneInfo("Asia/Shanghai")
 DATA_FILE = "data.json"
 
@@ -30,16 +29,12 @@ def now_time():
     return datetime.now(BJ_TZ)
 
 
-def date_key(dt):
-    return dt.strftime("%Y-%m-%d")
-
-
 def today_key():
-    return date_key(now_time())
+    return now_time().strftime("%Y-%m-%d")
 
 
 def yesterday_key():
-    return date_key(now_time() - timedelta(days=1))
+    return (now_time() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 def load_data():
@@ -75,24 +70,18 @@ def init_user(data, day, uid, name):
     })
 
 
-def find_open_work_day(data, uid):
-    """
-    找到用户还没下班的上班记录：
-    先找今天，再找昨天。
-    解决：1号上班，2号下班不能计算的问题。
-    """
+def fmt_minutes(minutes):
+    minutes = max(0, int(minutes))
+    return f"{minutes // 60}小时{minutes % 60}分钟"
+
+
+def find_work_day(data, uid):
     for day in [today_key(), yesterday_key()]:
         if day in data and uid in data[day]:
-            user_data = data[day][uid]
-            if user_data.get("on") and not user_data.get("off"):
+            u = data[day][uid]
+            if u.get("on") and not u.get("off"):
                 return day
     return None
-
-
-def fmt_minutes(minutes):
-    if minutes < 0:
-        minutes = 0
-    return f"{minutes // 60}小时{minutes % 60}分钟"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -108,20 +97,17 @@ async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
     info = context.job.data
+    data = load_data()
+    day = info["day"]
     uid = info["uid"]
     name = info["name"]
-    day = info["day"]
 
-    data = load_data()
     away = data.get(day, {}).get(uid, {}).get("away")
-
-    if not away:
-        return
-
-    await context.bot.send_message(
-        chat_id=context.job.chat_id,
-        text=f"⚠️ {name} 已超时，请尽快回坐。"
-    )
+    if away:
+        await context.bot.send_message(
+            chat_id=context.job.chat_id,
+            text=f"⚠️ {name} 已超时，请尽快回坐。"
+        )
 
 
 async def go_away(update, context, kind, label, mins):
@@ -134,10 +120,7 @@ async def go_away(update, context, kind, label, mins):
     init_user(data, day, uid, name)
 
     if data[day][uid].get("away"):
-        await update.message.reply_text(
-            "❌ 你已经离开中，请先点击 回坐/back",
-            reply_markup=keyboard
-        )
+        await update.message.reply_text("❌ 你已经离开中，请先点 回坐/back", reply_markup=keyboard)
         return
 
     data[day][uid]["away"] = {
@@ -146,7 +129,6 @@ async def go_away(update, context, kind, label, mins):
         "start": now.isoformat(),
         "mins": mins
     }
-
     save_data(data)
 
     for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
@@ -156,11 +138,7 @@ async def go_away(update, context, kind, label, mins):
         timeout_notice,
         mins * 60,
         chat_id=update.effective_chat.id,
-        data={
-            "uid": uid,
-            "name": name,
-            "day": day
-        },
+        data={"uid": uid, "name": name, "day": day},
         name=f"timeout_{uid}"
     )
 
@@ -173,7 +151,50 @@ async def go_away(update, context, kind, label, mins):
 
 
 async def daily_report(context: ContextTypes.DEFAULT_TYPE):
-    msg = "📊 每日统计功能暂时关闭，机器人正常运行"
+    data = load_data()
+    today = today_key()
+    yesterday = yesterday_key()
+    msg = f"📊 每日考勤统计 {today}（北京时间）\n包含：今天记录 + 昨天未下班夜班记录\n\n"
+    has_data = False
+
+    for day in [yesterday, today]:
+        if day not in data:
+            continue
+
+        for user_data in data[day].values():
+            if day == yesterday and user_data.get("off"):
+                continue
+            if not user_data.get("on"):
+                continue
+
+            has_data = Trueon_dt = datetime.fromisoformat(user_data["on"])
+            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
+            off_text = "未打卡"
+
+            if user_data.get("off"):
+                off_dt = datetime.fromisoformat(user_data["off"])
+                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
+                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+                work_text = fmt_minutes(work_minutes)
+            else:
+                work_minutes = int((now_time() - on_dt).total_seconds() // 60)
+                work_text = f"进行中，已上班 {fmt_minutes(work_minutes)}"
+
+            msg += (
+                f"👤 {user_data.get('name', '用户')}\n"
+                f"📅 记录日期：{day}\n"
+                f"🕘 上班：{on_text}\n"
+                f"🕕 下班：{off_text}\n"
+                f"🕒 工时：{work_text}\n"
+                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+                f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
+                f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+                f"📌 其他：{user_data.get('other', 0)}分钟\n"
+                f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
+            )
+
+    if not has_data:
+        msg += "暂无数据"
 
     for group_id in GROUP_IDS:
         await context.bot.send_message(chat_id=group_id, text=msg)
@@ -194,18 +215,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         data[day][uid]["away"] = None
-
         save_data(data)
 
         await update.message.reply_text(
-            f"✅ 上班打卡成功\n"
-            f"🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"✅ 上班打卡成功\n🕘 上班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
             reply_markup=keyboard
         )
 
     elif text == "下班/off":
-        work_day = find_open_work_day(data, uid)
-
+        work_day = find_work_day(data, uid)
         if not work_day:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
             return
@@ -216,11 +234,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data[work_day][uid]["off"] = now.isoformat()
         data[work_day][uid]["away"] = None
+        save_data(data)
 
         for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
             job.schedule_removal()
-
-        save_data(data)
 
         await update.message.reply_text(
             f"✅ 下班打卡成功\n"
@@ -244,14 +261,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "回坐/back":
         away_day = today_key()
-
-        if day in data and uid in data[day] and data[day][uid].get("away"):
-            away_day = day
-        elif yesterday_key() in data and uid in data[yesterday_key()] and data[yesterday_key()][uid].get("away"):
+        if uid in data.get(today_key(), {}) and data[today_key()][uid].get("away"):
+            away_day = today_key()
+        elif uid in data.get(yesterday_key(), {}) and data[yesterday_key()][uid].get("away"):
             away_day = yesterday_key()
 
         init_user(data, away_day, uid, name)
-
         away = data[away_day][uid].get("away")
         data[away_day][uid]["back"] += 1
 
@@ -261,8 +276,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not away:
             save_data(data)
             await update.message.reply_text(
-                f"✅ 回坐成功\n"
-                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"✅ 回坐成功\n🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
                 reply_markup=keyboard
             )
             return
@@ -270,7 +284,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start = datetime.fromisoformat(away["start"])
         actual_minutes = int((now - start).total_seconds() // 60)
         allowed = away.get("mins", 0)
-        kind = away.get("kind")if kind in ["meal", "toilet", "smoke", "other"]:
+        kind = away.get("kind")
+
+        if kind in ["meal", "toilet", "smoke", "other"]:
             data[away_day][uid][kind] += actual_minutes
 
         data[away_day][uid]["away"] = None
@@ -280,7 +296,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             f"{result}\n"
-            f"📌 类型：{away['label']}\n"
+            f"📌 类型：{away.get('label', '')}\n"
             f"⏱ 规定时间：{allowed}分钟\n"
             f"🕒 实际离开：{actual_minutes}分钟\n"
             f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
@@ -288,11 +304,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "统计/report":
-        report_day = find_open_work_day(data, uid) or today_key()
-
-        if report_day not in data or uid not in data[report_day]:
-            init_user(data, report_day, uid, name)
-
+        report_day = find_work_day(data, uid) or today_key()
+        init_user(data, report_day, uid, name)
         user_data = data[report_day][uid]
 
         on_text = "未打卡"
@@ -334,9 +347,7 @@ app.add_handler(CommandHandler("id", get_id))
 
 app.add_handler(
     MessageHandler(
-        filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report)$"
-        ),
+        filters.Regex(r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report)$"),
         handle_message
     )
 )
