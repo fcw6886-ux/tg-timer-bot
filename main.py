@@ -179,9 +179,9 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     if day not in data or not data[day]:
         msg = f"📊 每日考勤统计 {day}\n\n暂无数据"
     else:
-        msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
+    msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
 
-            for user_data in data[day].values():
+    for user_data in data[day].values():
         on_text = "未打卡"
         off_text = "未打卡"
         work_text = "未计算"
