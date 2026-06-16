@@ -360,4 +360,6 @@ app.job_queue.run_daily(
 
 print("Bot started OK")
 
+app.bot.delete_webhook(drop_pending_updates=True)
+
 app.run_polling()
