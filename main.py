@@ -172,67 +172,7 @@ async def go_away(update, context, kind, label, mins):
     )
 
 
-async def daily_report(context: ContextTypes.DEFAULT_TYPE):
-    data = load_data()
-    today = today_key()
-    yesterday = yesterday_key()
-
-    msg = f"📊 每日考勤统计 {today}（北京时间）\n"
-    msg += "包含：今天记录 + 昨天未下班夜班记录\n\n"
-
-    has_data = False
-    report_days = [yesterday, today]
-
-    for day in report_days:
-        if day not in data:
-            continue
-
-        for user_data in data[day].values():
-            # 昨天的记录，只统计还没下班的夜班
-            if day == yesterday and user_data.get("off"):
-                continue
-
-            # 今天的记录正常统计
-            if not user_data.get("on"):
-                continue
-
-            has_data = True
-
-            on_text = "未打卡"
-            off_text = "未打卡"
-            work_text = "未计算"
-
-            on_dt = datetime.fromisoformat(user_data["on"])
-            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-            if user_data.get("off"):
-                off_dt = datetime.fromisoformat(user_data["off"])
-                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
-                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
-                work_text = fmt_minutes(work_minutes)
-            else:
-                now = now_time()
-                work_minutes = int((now - on_dt).total_seconds() // 60)
-                work_text = f"进行中，已上班 {fmt_minutes(work_minutes)}"
-
-            msg += (
-                f"👤 {user_data.get('name', '用户')}\n"
-                f"📅 记录日期：{day}\n"
-                f"🕘 上班：{on_text}\n"
-                f"🕕 下班：{off_text}\n"
-                f"🕒 工时：{work_text}\n"
-                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
-                f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-                f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-                f"📌 其他：{user_data.get('other', 0)}分钟\n"
-                f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
-            )
-
-    if not has_data:
-        msg += "暂无数据"
-
-    for group_id in GROUP_IDS:
-        await context.bot.send_message(chat_id=group_id, text=msg)
+async def daily
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
