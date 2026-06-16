@@ -181,32 +181,32 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     else:
         msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
 
-        for user_data in data[day].values():
-    on_text = "未打卡"
-    off_text = "未打卡"
-    work_text = "未计算"
-
-            if user_data.get("on"):
-                on_dt = datetime.fromisoformat(user_data["on"])
-                on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-                if user_data.get("off"):
-                    off_dt = datetime.fromisoformat(user_data["off"])
-                    off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
-                    work_minutes = int((off_dt - on_dt).total_seconds() // 60)
-                    work_text = fmt_minutes(work_minutes)
-
-            msg += (
-                f"👤 {user_data.get('name', '用户')}\n"
-                f"🕘 上班：{on_text}\n"
-                f"🕕 下班：{off_text}\n"
-                f"🕒 工时：{work_text}\n"
-                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
-                f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-                f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-                f"📌 其他：{user_data.get('other', 0)}分钟\n"
-                f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
-            )
+            for user_data in data[day].values():
+        on_text = "未打卡"
+        off_text = "未打卡"
+        work_text = "未计算"
+    
+        if user_data.get("on"):
+            on_dt = datetime.fromisoformat(user_data["on"])
+            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
+    
+            if user_data.get("off"):
+                off_dt = datetime.fromisoformat(user_data["off"])
+                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
+                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+                work_text = fmt_minutes(work_minutes)
+    
+        msg += (
+            f"👤 {user_data.get('name', '用户')}\n"
+            f"🕘 上班：{on_text}\n"
+            f"🕕 下班：{off_text}\n"
+            f"🕒 工时：{work_text}\n"
+            f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+            f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
+            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+            f"📌 其他：{user_data.get('other', 0)}分钟\n"
+            f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
+        )
 
     for group_id in GROUP_IDS:
         await context.bot.send_message(chat_id=group_id, text=msg)
