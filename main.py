@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from telegram import Update, ReplyKeyboardMarkup
@@ -199,26 +199,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "下班/off":
-        on_time_str = data[day][uid].get("on")
-
+        work_day = day
+        on_time_str = data.get(day, {}).get(uid, {}).get("on")
+    
+        if not on_time_str:
+            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+            if uid in data.get(yesterday, {}) and data[yesterday][uid].get("on") and not data[yesterday][uid].get("off"):
+                work_day = yesterday
+                on_time_str = data[work_day][uid].get("on")
+    
         if not on_time_str:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
             return
-
+    
         on_time = datetime.fromisoformat(on_time_str)
         total_minutes = int((now - on_time).total_seconds() // 60)
-
-        data[day][uid]["off"] = now.isoformat()
+    
+        data[work_day][uid]["off"] = now.isoformat()
         save_data(data)
-
+    
         await update.message.reply_text(
             f"✅ 下班打卡成功\n"
             f"🕘 上班时间：{on_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"🕕 下班时间：{now.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"🕒 今日工时：{total_minutes // 60}小时{total_minutes % 60}分钟",
+            f"🕒 本次工时：{total_minutes // 60}小时{total_minutes % 60}分钟",
             reply_markup=keyboard
         )
-
     elif text == "吃饭/meal":
         await go_away(update, context, "meal", "吃饭", 30)
 
