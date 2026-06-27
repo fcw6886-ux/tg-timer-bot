@@ -437,6 +437,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         await update.message.reply_text(msg, reply_markup=keyboard)
 
+    elif text == "今日在线/admin_online":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        today = day
+        today_data = data.get(today, {})
+    
+        online_users = []
+    
+        for user_id, user_data in today_data.items():
+            if user_data.get("on") and not user_data.get("off"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                work_minutes = int((now - on_dt).total_seconds() // 60)
+                online_users.append(
+                    f"🟢 {user_data.get('name', '用户')}\n"
+                    f"🕘 上班：{on_dt.strftime('%H:%M:%S')}\n"
+                    f"⏱ 已工作：{work_minutes // 60}小时{work_minutes % 60}分钟"
+                )
+    
+        if not online_users:
+            await update.message.reply_text("👥 当前没有在线员工。", reply_markup=keyboard)
+            return
+    
+        msg = "👥 今日在线\n\n" + "\n\n".join(online_users)
+
+    await update.message.reply_text(msg, reply_markup=keyboard)
+
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -445,7 +473,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online)$"
         ),
         handle_message
     )
