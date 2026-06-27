@@ -540,6 +540,72 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         await update.message.reply_text(msg, reply_markup=keyboard)
 
+    elif text == "全员月统计/admin_month":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        month = now.strftime("%Y-%m")
+        users_result = {}
+    
+        for d, day_data in data.items():
+            if not d.startswith(month):
+                continue
+    
+            for user_id, user_data in day_data.items():
+                n = user_data.get("name", "用户")
+    
+                if n not in users_result:
+                    users_result[n] = {
+                        "days": 0,
+                        "work": 0,
+                        "meal": 0,
+                        "toilet": 0,
+                        "smoke": 0,
+                        "other": 0,
+                        "back": 0
+                    }
+    
+                if user_data.get("on"):
+                    users_result[n]["days"] += 1
+    
+                if user_data.get("on") and user_data.get("off"):
+                    on_dt = datetime.fromisoformat(user_data["on"])
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    mins = int((off_dt - on_dt).total_seconds() // 60)
+                    users_result[n]["work"] += mins
+    
+                users_result[n]["meal"] += user_data.get("meal", 0)
+                users_result[n]["toilet"] += user_data.get("toilet", 0)
+                users_result[n]["smoke"] += user_data.get("smoke", 0)
+                users_result[n]["other"] += user_data.get("other", 0)
+                users_result[n]["back"] += user_data.get("back", 0)
+    
+        if not users_result:
+            await update.message.reply_text("📅 本月暂无全员统计数据。", reply_markup=keyboard)
+            return
+    
+        msg = f"📅 全员月统计 {month}\n\n"
+    
+        for n, s in users_result.items():
+            work = s["work"]
+            away = s["meal"] + s["toilet"] + s["smoke"] + s["other"]
+            real_work = max(work - away, 0)
+    
+            msg += (
+                f"👤 {n}\n"
+                f"📅 出勤：{s['days']}天\n"
+                f"⏰ 总工时：{work // 60}小时{work % 60}分钟\n"
+                f"✅ 实际工时：{real_work // 60}小时{real_work % 60}分钟\n"
+                f"🍚 吃饭：{s['meal']}分钟\n"
+                f"🚽 厕所：{s['toilet']}分钟\n"
+                f"🚬 抽烟：{s['smoke']}分钟\n"
+                f"📌 其他：{s['other']}分钟\n"
+                f"🔄 回坐：{s['back']}次\n\n"
+            )
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
+
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -548,7 +614,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online|未下班/admin_unoff|工时排行/admin_rank)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online|未下班/admin_unoff|工时排行/admin_rank|全员月统计/admin_month)$"
         ),
         handle_message
     )
