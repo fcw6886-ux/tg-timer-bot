@@ -400,7 +400,7 @@ app.add_handler(
     MessageHandler(
         filters.Regex(
             r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month)$"
-        )
+        ),
         handle_message
     )
 )
