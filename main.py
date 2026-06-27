@@ -465,6 +465,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg, reply_markup=keyboard)
 
+    elif text == "工时排行/admin_rank":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        month = now.strftime("%Y-%m")
+        ranks = {}
+    
+        for d, day_data in data.items():
+            if not d.startswith(month):
+                continue
+    
+            for user_id, user_data in day_data.items():
+                n = user_data.get("name", "用户")
+    
+                if n not in ranks:
+                    ranks[n] = 0
+    
+                if user_data.get("on") and user_data.get("off"):
+                    on_dt = datetime.fromisoformat(user_data["on"])
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    mins = int((off_dt - on_dt).total_seconds() // 60)
+    
+                    away = (
+                        user_data.get("meal", 0)
+                        + user_data.get("toilet", 0)
+                        + user_data.get("smoke", 0)
+                        + user_data.get("other", 0)
+                    )
+    
+                    ranks[n] += max(mins - away, 0)
+    
+        if not ranks:
+            await update.message.reply_text("🏆 本月暂无排行数据。", reply_markup=keyboard)
+            return
+    
+        sorted_ranks = sorted(ranks.items(), key=lambda x: x[1], reverse=True)
+    
+        msg = f"🏆 工时排行 {month}\n\n"
+    
+        medals = ["🥇", "🥈", "🥉"]
+    
+        for i, (n, mins) in enumerate(sorted_ranks, start=1):
+            icon = medals[i - 1] if i <= 3 else f"{i}."
+            msg += f"{icon} {n}：{mins // 60}小时{mins % 60}分钟\n"
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
+
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -473,7 +521,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online|工时排行/admin_rank)$"
         ),
         handle_message
     )
