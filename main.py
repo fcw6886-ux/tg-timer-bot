@@ -463,7 +463,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         msg = "👥 今日在线\n\n" + "\n\n".join(online_users)
 
-    await update.message.reply_text(msg, reply_markup=keyboard)
+        await update.message.reply_text(msg, reply_markup=keyboard)
 
     elif text == "工时排行/admin_rank":
         if str(uid) not in ADMIN_IDS:
@@ -476,7 +476,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for d, day_data in data.items():
             if not d.startswith(month):
                 continue
-    
+        
             for user_id, user_data in day_data.items():
                 n = user_data.get("name", "用户")
     
