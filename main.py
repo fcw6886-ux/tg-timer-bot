@@ -22,7 +22,8 @@ keyboard = ReplyKeyboardMarkup(
     [
         ["上班/on", "下班/off", "吃饭/meal"],
         ["上厕所/wc", "抽烟/smoke", "其他"],
-        ["回坐/back", "统计/report", "月统计/month"]
+        ["回坐/back", "统计/report", "月统计/month"],
+        ["管理员后台/admin"]
     ],
     resize_keyboard=True
 )
@@ -391,6 +392,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         await update.message.reply_text(msg, reply_markup=keyboard)
 
+    elif text == "管理员后台/admin":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
+            return
+    
+        await update.message.reply_text(
+            "👑 管理员后台\n\n"
+            "📋 今日考勤：今日考勤/admin_today\n"
+            "👥 今日在线：今日在线/admin_online\n"
+            "🔴 未下班：未下班/admin_unoff\n"
+            "📅 全员月统计：全员月统计/admin_month\n"
+            "🏆 工时排行：工时排行/admin_rank",
+            reply_markup=keyboard
+        )
+
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -399,7 +415,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin)$"
         ),
         handle_message
     )
