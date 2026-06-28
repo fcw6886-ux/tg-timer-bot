@@ -193,6 +193,7 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    print(repr(text))
     data = load_data()
     day = today_key()
     uid = str(update.effective_user.id)
