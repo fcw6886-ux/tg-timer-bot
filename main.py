@@ -144,24 +144,39 @@ async def go_away(update, context, kind, label, mins):
 async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     day = today_key()
+    now = now_time()
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    if day not in data or not data[day]:
+    report_items = []
+
+    # 1. 今天的记录
+    for user_data in data.get(day, {}).values():
+        report_items.append(user_data)
+
+    # 2. 昨天上班、今天下班的夜班记录
+    for user_data in data.get(yesterday, {}).values():
+        if user_data.get("on") and user_data.get("off"):
+            off_dt = datetime.fromisoformat(user_data["off"])
+            if off_dt.strftime("%Y-%m-%d") == day:
+                report_items.append(user_data)
+
+    if not report_items:
         msg = f"📊 每日考勤统计 {day}\n\n暂无数据"
     else:
         msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
 
-        for user_data in data[day].values():
+        for user_data in report_items:
             on_text = "未打卡"
             off_text = "未打卡"
             work_text = "未计算"
 
             if user_data.get("on"):
                 on_dt = datetime.fromisoformat(user_data["on"])
-                on_text = on_dt.strftime("%H:%M:%S")
+                on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
 
                 if user_data.get("off"):
                     off_dt = datetime.fromisoformat(user_data["off"])
-                    off_text = off_dt.strftime("%H:%M:%S")
+                    off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
                     work_minutes = int((off_dt - on_dt).total_seconds() // 60)
                     work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
 
@@ -169,7 +184,8 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
                 f"👤 {user_data.get('name', '用户')}\n"
                 f"🕘 上班：{on_text}\n"
                 f"🕕 下班：{off_text}\n"
-                f"🕒 工时：{work_text}\n"f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+                f"🕒 工时：{work_text}\n"
+                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
                 f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
                 f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
                 f"📌 其他：{user_data.get('other', 0)}分钟\n"
@@ -177,7 +193,7 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
             )
 
     for group_id in GROUP_IDS:
-        await context.bot.send_message(chat_id=group_id, text=msg)
+        await context.bot.send_message(chat_id=group_id, text=msg)    
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
