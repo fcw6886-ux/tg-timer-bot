@@ -451,7 +451,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     
         today = day
-        today_data = data.get(today, {})
+        today_data = {}
+        
+        for d, day_data in data.items():
+            for user_id, user_data in day_data.items():
+                if user_data.get("off"):
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    if off_dt.strftime("%Y-%m-%d") == today:
+                        today_data[user_id] = user_data
     
         if not today_data:
             await update.message.reply_text("📋 今日暂无考勤记录", reply_markup=keyboard)
