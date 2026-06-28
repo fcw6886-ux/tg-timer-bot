@@ -145,16 +145,12 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     day = today_key()
     now = now_time()
-    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-
+    
     report_items = []
 
-    # 1. 今天的记录
-    for user_data in data.get(day, {}).values():
-        report_items.append(user_data)
-
-    # 2. 昨天上班、今天下班的夜班记录
-    for user_data in data.get(yesterday, {}).values():
+    # 今天完成下班的所有记录（包括跨天夜班）
+for d, day_data in data.items():
+    for user_data in day_data.values():
         if user_data.get("on") and user_data.get("off"):
             off_dt = datetime.fromisoformat(user_data["off"])
             if off_dt.strftime("%Y-%m-%d") == day:
