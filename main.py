@@ -189,7 +189,7 @@ for d, day_data in data.items():
             )
 
     for group_id in GROUP_IDS:
-        await context.bot.send_message(chat_id=group_id, text=msg)    
+        await context.bot.send_message(chat_id=group_id, text=msg)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
