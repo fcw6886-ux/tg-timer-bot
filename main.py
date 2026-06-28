@@ -437,14 +437,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🌙 夜班：{night_count}人\n"
             f"☀️ 白班：{day_count}人\n\n"
             f"👇 点击下面功能\n\n"
-            f"📋 今日考勤\n"
-            f"👥 今日在线\n"
-            f"🔴 未下班\n"
-            f"📅 全员月统计\n"
-            f"🏆 工时排行",
+            f"📋 今日考勤：admin_today\n"
+            f"👥 今日在线：admin_online\n"
+            f"🔴 未下班：admin_unoff\n"
+            f"📅 全员月统计：admin_month\n"
+            f"🏆 工时排行：admin_rank",
             reply_markup=keyboard
         )
-                
+                            
     elif text == "今日考勤/admin_today":
         if str(uid) not in ADMIN_IDS:
             await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
