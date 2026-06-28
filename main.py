@@ -404,19 +404,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, reply_markup=keyboard)
 
     elif text == "管理员后台/admin":
-        if str(uid) not in ADMIN_IDS:
-            await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
-            return
+    if str(uid) not in ADMIN_IDS:
+        await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
+        return
+
+    today_data = data.get(day, {})
+
+    online_count = 0
+    off_count = 0
+    night_count = 0
+    day_count = 0
+
+    for user_data in today_data.values():
+        if user_data.get("on"):
+            on_dt = datetime.fromisoformat(user_data["on"])
+
+            if on_dt.hour >= 17:
+                night_count += 1
+            else:
+                day_count += 1
+
+            if user_data.get("off"):
+                off_count += 1
+            else:
+                online_count += 1
+
+    await update.message.reply_text(
+        f"👑 管理后台\n\n"
+        f"👥 今日在线：{online_count}人\n"
+        f"✅ 今日下班：{off_count}人\n"
+        f"🔴 未下班：{online_count}人\n"
+        f"🌙 夜班：{night_count}人\n"
+        f"☀️ 白班：{day_count}人\n\n"
+        f"👇 点击下面功能\n\n"
+        f"📋 今日考勤\n"
+        f"👥 今日在线\n"
+        f"🔴 未下班\n"
+        f"📅 全员月统计\n"
+        f"🏆 工时排行"
+        reply_markup=keyboard
+    )
     
-        await update.message.reply_text(
-            "👑 管理员后台\n\n"
-            "📋 今日考勤：今日考勤/admin_today\n"
-            "👥 今日在线：今日在线/admin_online\n"
-            "🔴 未下班：未下班/admin_unoff\n"
-            "📅 全员月统计：全员月统计/admin_month\n"
-            "🏆 工时排行：工时排行/admin_rank",
-            reply_markup=keyboard
-        )
     elif text == "今日考勤/admin_today":
         if str(uid) not in ADMIN_IDS:
             await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
