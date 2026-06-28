@@ -404,9 +404,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, reply_markup=keyboard)
 
     elif text == "管理员后台/admin":
-    if str(uid) not in ADMIN_IDS:
-        await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
-        return
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
+            return
 
     today_data = data.get(day, {})
 
